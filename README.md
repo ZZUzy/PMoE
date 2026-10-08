@@ -1,4 +1,4 @@
-# PS-MoE
+# PMoE
 
 **A reliability-aware pairwise learning framework for drug–target interaction prediction with interaction-driven graph representations**
 
