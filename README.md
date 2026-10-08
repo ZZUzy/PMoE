@@ -23,15 +23,15 @@ PMoE is a **preference-guided Mixture-of-Experts framework** for drug-target int
 
 The contribution of a molecular representation varies across drug-target pairs. Sequence-derived features can be more informative for some pairs, while local structural relationships and atom-residue contacts can be more informative for others. PMoE explicitly learns this **pair-specific modality preference** rather than assigning the same relative importance to sequence and structure for every pair.
 
-![Figure 1. Pair-specific modality preference in drug-target interaction prediction.](assets/fig1.pdf)
+![Figure 1. Pair-specific modality preference in drug-target interaction prediction.](PS-MoE/assets/fig1.pdf)
 
-**Figure 1.** Illustration of pair-specific modality preference. Pair A is better characterized by sequence-derived representations, whereas Pair B relies more on structure-derived interaction information. This is a conceptual illustration of varying modality contributions. [PDF version](assets/fig1.pdf)
+**Figure 1.** Illustration of pair-specific modality preference. Pair A is better characterized by sequence-derived representations, whereas Pair B relies more on structure-derived interaction information. This is a conceptual illustration of varying modality contributions. [PDF version](PS-MoE/assets/fig1.pdf)
 
 ## Framework
 
-![Figure 2. Overview of the PMoE framework.](assets/fig2.pdf)
+![Figure 2. Overview of the PMoE framework.](PS-MoE/assets/fig2.pdf)
 
-**Figure 2.** (a) Dual-stream modality experts and preference-guided adaptive fusion. (b) Pocket-centered interaction graph construction and node/edge features. (c) Preference scoring and router learning. (d) Modality-specific knowledge distillation. [PDF version](assets/fig2.pdf)
+**Figure 2.** (a) Dual-stream modality experts and preference-guided adaptive fusion. (b) Pocket-centered interaction graph construction and node/edge features. (c) Preference scoring and router learning. (d) Modality-specific knowledge distillation. [PDF version](PS-MoE/assets/fig2.pdf)
 
 ### 1. Dual-stream expert modeling
 
