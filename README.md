@@ -17,7 +17,7 @@ PS-MoE explicitly models atom–residue interaction pathways and adaptively inte
 
 ## Installation
 
-PS-MoE is implemented in Python and PyTorch. A CUDA-enabled GPU is recommended for feature extraction, training, and inference.
+PMoE is implemented in Python and PyTorch. A CUDA-enabled GPU is recommended for feature extraction, training, and inference.
 
 ### Environment
 
