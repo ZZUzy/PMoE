@@ -1,27 +1,90 @@
 # PMoE
 
-**A reliability-aware pairwise learning framework for drug–target interaction prediction with interaction-driven graph representations**
+**Preference-Guided Multimodal Learning with Pocket-Centered Complexes Improves Drug-Target Interaction Prediction**
 
-PS-MoE explicitly models atom–residue interaction pathways and adaptively integrates sequence- and graph-based experts through reliability supervision. The framework improves DTI prediction and generalization, particularly for unseen drug–target pairs and scarce-data settings.
+PMoE is a **preference-guided Mixture-of-Experts framework** for drug-target interaction (DTI) prediction. It combines sequence semantics with local interaction geometry and learns how much each modality should contribute to each drug-target pair. Pair-specific preference scores supervise adaptive fusion and modality-specific knowledge distillation.
 
-![PS-MoE framework](https://github.com/user-attachments/assets/97a80fb1-d9a5-42c2-aefe-2f8fc5e17e36)
+> **Naming:** The method is called **PMoE** in the current manuscript. The repository URL remains `ZZUzy/PS-MoE`; existing `PS-MoE/` directories and the Python class `PS_MoE` retain their names for compatibility with the released code.
 
 ## Contents
 
+- [Motivation](#motivation)
+- [Framework](#framework)
+- [Benchmark results](#benchmark-results)
 - [Installation](#installation)
 - [Repository structure](#repository-structure)
 - [Demo data](#demo-data)
 - [Complex construction](#complex-construction)
 - [Reproducibility](#reproducibility)
 - [Contact](#contact)
+- [License](#license)
+
+## Motivation
+
+The contribution of a molecular representation varies across drug-target pairs. Sequence-derived features can be more informative for some pairs, while local structural relationships and atom-residue contacts can be more informative for others. PMoE explicitly learns this **pair-specific modality preference** rather than assigning the same relative importance to sequence and structure for every pair.
+
+![Figure 1. Pair-specific modality preference in drug-target interaction prediction.](assets/fig1.png)
+
+**Figure 1.** Illustration of pair-specific modality preference. Pair A is better characterized by sequence-derived representations, whereas Pair B relies more on structure-derived interaction information. This is a conceptual illustration of varying modality contributions. [PDF version](assets/fig1.pdf)
+
+## Framework
+
+![Figure 2. Overview of the PMoE framework.](assets/fig2.png)
+
+**Figure 2.** (a) Dual-stream modality experts and preference-guided adaptive fusion. (b) Pocket-centered interaction graph construction and node/edge features. (c) Preference scoring and router learning. (d) Modality-specific knowledge distillation. [PDF version](assets/fig2.pdf)
+
+### 1. Dual-stream expert modeling
+
+- **Sequence expert:** SMILES-BERT and ProtBERT encode drug SMILES and protein sequences. Convolutional blocks and hierarchical masked attention capture intramolecular and intermolecular sequence information.
+- **Graph expert:** A pocket-centered complex defines explicit atom-residue interaction pathways. Atom and residue descriptors, ESM-2/ChemBERTa-2 representations, and local distance/orientation features are encoded with edge updates and GATv2-based message passing.
+
+Protein structures are predicted with AlphaFold2, ligand conformers are generated with RDKit, and the highest-ranked DoGSite3 pocket is selected. The ligand heavy-atom center is translated to the pocket center. An atom-residue edge is formed when the ligand atom lies within **6 Å** of any atom in the residue. This translation defines an initial spatial configuration; it is **not an optimized docking pose**.
+
+### 2. Pair-specific preference learning
+
+During training, each expert's **true class probability (TCP)** measures the probability assigned to the correct interaction label. For pair $i$ and modality $m$, preference scores are computed from the expert cross-entropy error:
+
+$$
+d_{i,m}=-\log p_{i,m}^{(y_i)},\qquad
+q_{i,m}=\frac{\exp(-d_{i,m}/\gamma)}{\sum_k\exp(-d_{i,k}/\gamma)}.
+$$
+
+The router predicts sequence/graph weights from the expert representations. A KL-divergence objective aligns routing weights with the detached preference targets, while entropy regularization discourages premature concentration on one expert. **Labels are used only to compute training targets; inference routing does not require ground-truth labels.**
+
+### 3. Adaptive fusion and modality-specific distillation
+
+The learned routing weights form a weighted sum of the sequence and graph representations, followed by a feature transformation for multimodal prediction. For distillation, transformed expert features form a routing-weighted teacher representation. Teacher and fused student features are mapped to normalized feature distributions and aligned with a squared-distance loss; the teacher target is detached.
+
+The manuscript's overall objective is:
+
+$$
+\mathcal{L}_{\mathrm{total}}
+=\mathcal{L}_{m}+\mathcal{L}_{s}+\mathcal{L}_{g}
++\lambda\left(\mathcal{L}_{\mathrm{entropy}}+\alpha\mathcal{L}_{\mathrm{pref}}\right)
++\beta\mathcal{L}_{\mathrm{distill}}.
+$$
+
+## Benchmark results
+
+The following warm-start (random-split) results are reported in Tables I-III of the current manuscript, as **mean ± standard deviation over five evaluation runs**. They are manuscript-reported values, not results generated by this README update.
+
+| Dataset | AUROC | AUPRC | F1-score |
+| --- | --- | --- | --- |
+| DrugBank | 0.9398 ± 0.002 | 0.9453 ± 0.001 | 0.8789 ± 0.002 |
+| Davis | 0.9367 ± 0.003 | 0.8723 ± 0.002 | 0.7883 ± 0.003 |
+| KIBA | 0.9417 ± 0.006 | 0.8432 ± 0.002 | 0.7592 ± 0.004 |
+
+The study also evaluates drug cold-start, target cold-start, joint cold-start, Davis-to-KIBA transfer, and sparse training with 5%, 10%, 20%, and 30% of the interactions. PMoE improves several key metrics, but not every metric on every dataset; for example, the strongest baseline has higher precision on the KIBA random split.
+
+An ERBB2 case study prioritizes **100 candidates from 2,647 approved drugs**, including **14 compounds with previously reported ERBB2-related evidence**. Database annotations, kinase profiling, and disease-model evidence do not uniformly establish direct binding. Docking and interaction visualizations support computational prioritization; new candidates require experimental validation.
 
 ## Installation
 
-PMoE is implemented in Python and PyTorch. A CUDA-enabled GPU is recommended for feature extraction, training, and inference.
+PMoE is implemented in Python and PyTorch. The current public model includes explicit CUDA calls, so use a CUDA-enabled GPU for this implementation.
 
 ### Environment
 
-The main environment used in the experiments includes:
+The existing project documentation lists the following software. Choose mutually compatible package versions for your Python/CUDA installation; the installation commands below are a starting point, not a locked environment:
 
 - Python 3.9
 - PyTorch 2.1.1
@@ -44,8 +107,8 @@ git clone https://github.com/ZZUzy/PS-MoE.git
 cd PS-MoE
 
 # Create the environment
-conda create -n psmoe python=3.9
-conda activate psmoe
+conda create -n pmoe python=3.9
+conda activate pmoe
 
 # Install PyTorch according to the local CUDA version
 pip install torch==2.1.1
@@ -78,7 +141,7 @@ graph_path = "./ComplexGraph_6A/"
 ```text
 PS-MoE/
 ├── Data_process.py                 # dataset splitting and feature loading
-├── Model_EMOE.py                   # PS-MoE model
+├── Model_EMOE.py                   # PMoE model (legacy class name: PS_MoE)
 ├── Train_cpi.py                    # training and evaluation
 ├── metric.py                       # evaluation metrics
 ├── utils.py                        # utility functions
@@ -127,11 +190,11 @@ For a drug–target pair with drug ID `D` and protein ID `P`, `Data_process.py` 
 D+P_graph.pth
 ```
 
-The public demo data can therefore be used to verify that graph files are successfully loaded and passed through PS-MoE before running the complete dataset.
+The public demo data can therefore be used to verify that graph files are successfully loaded and passed through PMoE before running the complete dataset.
 
 ## Complex construction
 
-The `PS-MoE/Complex/` directory contains the scripts used to convert protein–ligand complexes into interaction-driven graph representations.
+The `PS-MoE/Complex/` directory contains the scripts used to convert protein–ligand complexes into pocket-centered interaction graph representations. Input coordinates should first be aligned using the pocket-centered construction described above; the wrapper does not run AlphaFold2 or DoGSite3 for you.
 
 ### Input format
 
@@ -142,7 +205,7 @@ complex_id.pdb
 complex_id.sdf
 ```
 
-For PS-MoE datasets, the recommended base name is the corresponding drug–target pair identifier:
+For PMoE datasets, the recommended base name is the corresponding drug–target pair identifier:
 
 ```text
 Drug_ID+Protein_ID.pdb
@@ -160,7 +223,7 @@ The SDF file must contain three-dimensional ligand coordinates. A single SDF fil
 - `construct_dataset.py` optionally combines individual graph objects and labels into a serialized dataset.
 - `Complex_dataprep_workflow.py` provides a wrapper for executing the above stages sequentially.
 
-### Interaction-driven graph generation
+### Pocket-centered interaction graph generation
 
 The graph-construction code performs the following operations:
 
@@ -168,7 +231,7 @@ The graph-construction code performs the following operations:
 2. Identifies protein residues containing atoms within 6 Å of each ligand atom.
 3. Represents ligand atoms and nearby protein residues as graph nodes.
 4. Constructs atom–residue interaction edges and records distances to residue backbone/reference atoms as edge features.
-5. Incorporates ANKH, ESM, and ChemBERTa representations when the corresponding embedding files are available.
+5. Incorporates configured protein and ligand embeddings. The manuscript describes ESM-2 and ChemBERTa-2; the public preprocessing wrapper also requests ANKH embeddings, so verify the feature configuration and model input dimensions before reproducing the manuscript.
 6. Saves each graph as:
 
 ```text
@@ -179,10 +242,10 @@ A graph-generation log is written to the `graph_generation_logs/` directory, inc
 
 ### Running the workflow
 
-The intended workflow can be launched with:
+The wrapper invokes `python -m dataprep.*`. Before using it, make the preprocessing scripts available as an importable `dataprep` package (or update those module paths to match your checkout). The scripts are currently documented under `PS-MoE/Complex/`; the command below is not a zero-configuration pipeline. After resolving the module paths, run:
 
 ```bash
-python PS-MoE/Complex_dataprep_workflow.py \
+python Complex_dataprep_workflow.py \
   --data_dir <directory_containing_matched_pdb_and_sdf_files> \
   --save_dir <output_name_or_directory> \
   --y_data <label_file.csv_or_json>
@@ -190,7 +253,7 @@ python PS-MoE/Complex_dataprep_workflow.py \
 
 Before running the workflow, update the local paths of the ANKH, ESM, and ChemBERTa checkpoints in the corresponding scripts. The preprocessing scripts retain several local default paths, so these paths must be replaced with locations available on the current machine.
 
-The main PS-MoE training code directly loads the individual `*_graph.pth` files from `ComplexGraph_6A/`. Therefore, running `construct_dataset.py` is optional when the goal is to train PS-MoE with `Data_process.py`.
+The main PMoE training code directly loads the individual `*_graph.pth` files from `ComplexGraph_6A/`. Therefore, running `construct_dataset.py` is optional when the goal is to train PMoE with `Data_process.py`.
 
 ## Reproducibility
 
@@ -268,23 +331,19 @@ The ratios evaluated in the manuscript are:
 
 ### 4. Training configuration
 
-The manuscript reports the following main settings:
+The current public training script uses the following settings:
 
 ```python
 SEED = 3407
 TRAIN_BATCH_SIZE = 64
 TEST_BATCH_SIZE = 64
-LR = 5e-5
+LR = 1e-4
 NUM_EPOCHS = 100
 
-optimizer = torch.optim.Adam(
-    model.parameters(),
-    lr=LR,
-    weight_decay=1e-4
-)
+optimizer = torch.optim.Adam(model.parameters(), lr=LR)
 ```
 
-The current `Train_cpi.py` uses `LR = 1e-4` without weight decay. Update these values when reproducing the settings reported in the manuscript.
+The manuscript reports `lambda = alpha = beta = 0.1` for the auxiliary loss coefficients and provides detailed implementation settings in Supplementary Table S2. Use the manuscript configuration when reproducing its reported results; the public script defaults alone do not establish an exact reproduction.
 
 ### 5. Run training
 
@@ -305,7 +364,9 @@ To avoid overwriting checkpoints across datasets, use:
 model_file_name = f"Pretrain_Models/{dataset}.model"
 ```
 
-The public training script performs one seeded split. To reproduce the mean and standard deviation reported over five runs, repeat the experiment using the corresponding split files or seeds and aggregate the resulting metrics.
+The current manuscript reports **five evaluation runs**, using a **7:2:1 training/validation/test split** except for sparse-data experiments. The public script performs one seeded run, and the cold-start calls in `Data_process.py` currently use `frac=[0.8, 0.1, 0.1]`. Match the intended split protocol and repeat the evaluation before comparing means and standard deviations.
+
+Also review the final evaluation block in `Train_cpi.py`: it currently passes `dev_loader` to `predicting` after reloading the checkpoint, despite the adjacent test comment. Final held-out test evaluation should use `test_loader`. This documentation update does not modify the training code.
 
 ## Contact
 
